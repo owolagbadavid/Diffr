@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>deniro — PR Review</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <h1 id="logo">deniro</h1>
+      <nav id="breadcrumbs"></nav>
+    </div>
+    <div id="user-area"></div>
+  </header>
+
+  <main>
+    <!-- Login / landing -->
+    <section id="landing" class="hidden">
+      <div class="landing-box">
+        <h2>Customize how you review pull requests</h2>
+        <p class="muted">Sign in with GitHub to browse your repos, or enter any public repo below.</p>
+        <a href="/auth/login" class="btn btn-gh">Sign in with GitHub</a>
+        <div class="divider"><span>or</span></div>
+        <form id="repo-form">
+          <input type="text" id="repo-input" placeholder="owner/repo" autocomplete="off" spellcheck="false" />
+          <button type="submit">Go</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Repo list (logged in) -->
+    <section id="repo-list" class="hidden">
+      <div class="section-header">
+        <h2>Your repositories</h2>
+      </div>
+      <div id="repo-search-bar">
+        <input type="text" id="repo-search" placeholder="Filter repositories..." autocomplete="off" spellcheck="false" />
+      </div>
+      <div id="repo-table"></div>
+    </section>
+
+    <!-- PR list -->
+    <section id="pr-list" class="hidden">
+      <div class="section-header">
+        <h2 id="pr-list-title"></h2>
+      </div>
+      <div id="pr-table"></div>
+      <p id="pr-empty" class="hidden muted">No open pull requests.</p>
+    </section>
+
+    <!-- PR detail -->
+    <section id="pr-detail" class="hidden">
+      <div class="section-header">
+        <h2 id="pr-detail-title"></h2>
+      </div>
+      <div class="controls">
+        <label for="strategy-select">Strategy:</label>
+        <select id="strategy-select"></select>
+      </div>
+      <div id="file-groups"></div>
+    </section>
+
+    <!-- Loading / error -->
+    <div id="loading" class="hidden">Loading...</div>
+    <div id="error" class="hidden"></div>
+  </main>
+
+  <!-- Full file viewer overlay -->
+  <div id="file-viewer" class="hidden">
+    <div class="file-viewer-bar">
+      <span id="file-viewer-title"></span>
+      <button id="file-viewer-close" class="link-btn">Close</button>
+    </div>
+    <div id="file-viewer-content"></div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
