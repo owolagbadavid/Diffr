@@ -16,8 +16,6 @@ import (
 )
 
 // Client talks to the GitHub API.
-// Most methods use manual HTTP for now; FetchPRFiles uses go-github
-// with its iterator to paginate through all changed files.
 type Client struct {
 	Token      string
 	HTTPClient *http.Client
@@ -35,6 +33,12 @@ func NewClient(token string, httpClient *http.Client) *Client {
 		HTTPClient: httpClient,
 		ghClient:   ghc,
 	}
+}
+
+type apiResponse struct {
+	Body    []byte
+	HasNext bool
+	HasPrev bool
 }
 
 type ghPR struct {
@@ -55,7 +59,7 @@ type ghPR struct {
 
 // GetUser returns the authenticated user.
 func (c *Client) GetUser() (*model.User, error) {
-	body, err := c.get("https://api.github.com/user")
+	resp, err := c.getAPI("https://api.github.com/user")
 	if err != nil {
 		return nil, err
 	}
@@ -64,17 +68,18 @@ func (c *Client) GetUser() (*model.User, error) {
 		Name      string `json:"name"`
 		AvatarURL string `json:"avatar_url"`
 	}
-	if err := json.Unmarshal(body, &raw); err != nil {
+	if err := json.Unmarshal(resp.Body, &raw); err != nil {
 		return nil, fmt.Errorf("decoding user: %w", err)
 	}
 	return &model.User{Login: raw.Login, Name: raw.Name, AvatarURL: raw.AvatarURL}, nil
 }
 
 // ListUserRepos returns repositories for the authenticated user.
-func (c *Client) ListUserRepos() ([]model.Repository, error) {
-	body, err := c.get("https://api.github.com/user/repos?sort=updated&per_page=50&affiliation=owner,collaborator,organization_member")
+func (c *Client) ListUserRepos(page int) ([]model.Repository, bool, bool, error) {
+	apiURL := fmt.Sprintf("https://api.github.com/user/repos?sort=updated&per_page=30&page=%d&affiliation=owner,collaborator,organization_member", page)
+	resp, err := c.getAPI(apiURL)
 	if err != nil {
-		return nil, err
+		return nil, false, false, err
 	}
 	var raw []struct {
 		Name        string `json:"name"`
@@ -90,8 +95,8 @@ func (c *Client) ListUserRepos() ([]model.Repository, error) {
 			AvatarURL string `json:"avatar_url"`
 		} `json:"owner"`
 	}
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("decoding repos: %w", err)
+	if err := json.Unmarshal(resp.Body, &raw); err != nil {
+		return nil, false, false, fmt.Errorf("decoding repos: %w", err)
 	}
 
 	repos := make([]model.Repository, len(raw))
@@ -109,21 +114,21 @@ func (c *Client) ListUserRepos() ([]model.Repository, error) {
 			OwnerAvatar: r.Owner.AvatarURL,
 		}
 	}
-	return repos, nil
+	return repos, resp.HasNext, resp.HasPrev, nil
 }
 
 // ListPRs returns open pull requests for a repo.
-func (c *Client) ListPRs(owner, repo string) ([]model.PullRequest, error) {
-	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=open&per_page=30", owner, repo)
+func (c *Client) ListPRs(owner, repo string, page int) ([]model.PullRequest, bool, bool, error) {
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=open&per_page=30&page=%d", owner, repo, page)
 
-	body, err := c.get(apiURL)
+	resp, err := c.getAPI(apiURL)
 	if err != nil {
-		return nil, err
+		return nil, false, false, err
 	}
 
 	var raw []ghPR
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
+	if err := json.Unmarshal(resp.Body, &raw); err != nil {
+		return nil, false, false, fmt.Errorf("decoding response: %w", err)
 	}
 
 	prs := make([]model.PullRequest, len(raw))
@@ -140,11 +145,10 @@ func (c *Client) ListPRs(owner, repo string) ([]model.PullRequest, error) {
 			Draft:     p.Draft,
 		}
 	}
-	return prs, nil
+	return prs, resp.HasNext, resp.HasPrev, nil
 }
 
 // FetchPRFiles returns all changed files for a pull request.
-// Uses go-github's iterator to paginate through every page automatically.
 func (c *Client) FetchPRFiles(ctx context.Context, owner, repo string, number int) ([]model.FileDiff, error) {
 	ctx = context.WithValue(ctx, gh.BypassRateLimitCheck, true)
 
@@ -167,7 +171,6 @@ func (c *Client) FetchPRFiles(ctx context.Context, owner, repo string, number in
 }
 
 // FetchFileContent fetches file content via the GitHub Contents API.
-// Accepts a contents_url like https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={sha}
 func (c *Client) FetchFileContent(ctx context.Context, contentsURL string) (string, error) {
 	owner, repo, path, ref, err := parseContentsURL(contentsURL)
 	if err != nil {
@@ -197,7 +200,6 @@ func parseContentsURL(contentsURL string) (owner, repo, path, ref string, err er
 	if err != nil {
 		return "", "", "", "", err
 	}
-	// Path: /repos/{owner}/{repo}/contents/{path}
 	trimmed := strings.TrimPrefix(u.Path, "/repos/")
 	parts := strings.SplitN(trimmed, "/", 4)
 	if len(parts) < 4 || parts[2] != "contents" {
@@ -206,7 +208,8 @@ func parseContentsURL(contentsURL string) (owner, repo, path, ref string, err er
 	return parts[0], parts[1], parts[3], u.Query().Get("ref"), nil
 }
 
-func (c *Client) get(apiURL string) ([]byte, error) {
+// getAPI performs a GET request and parses pagination from the Link header.
+func (c *Client) getAPI(apiURL string) (*apiResponse, error) {
 	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return nil, err
@@ -230,5 +233,11 @@ func (c *Client) get(apiURL string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading body: %w", err)
 	}
-	return buf, nil
+
+	link := resp.Header.Get("Link")
+	return &apiResponse{
+		Body:    buf,
+		HasNext: strings.Contains(link, `rel="next"`),
+		HasPrev: strings.Contains(link, `rel="prev"`),
+	}, nil
 }

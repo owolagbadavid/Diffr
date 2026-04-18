@@ -17,10 +17,24 @@ func NewHandler(baseGH *github.Client) *Handler {
 	return &Handler{baseGH: baseGH}
 }
 
-// ghClient creates a per-request GitHub client with the user's token.
 func (h *Handler) ghClient(r *http.Request) *github.Client {
 	token := TokenFromContext(r.Context())
 	return github.NewClient(token, h.baseGH.HTTPClient)
+}
+
+func pageParam(r *http.Request) int {
+	p, err := strconv.Atoi(r.URL.Query().Get("page"))
+	if err != nil || p < 1 {
+		return 1
+	}
+	return p
+}
+
+type paginatedResponse struct {
+	Data    any  `json:"data"`
+	Page    int  `json:"page"`
+	HasNext bool `json:"has_next"`
+	HasPrev bool `json:"has_prev"`
 }
 
 // GET /api/user
@@ -43,14 +57,20 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GET /api/user/repos
+// GET /api/user/repos?page=1
 func (h *Handler) ListUserRepos(w http.ResponseWriter, r *http.Request) {
-	repos, err := h.ghClient(r).ListUserRepos()
+	page := pageParam(r)
+	repos, hasNext, hasPrev, err := h.ghClient(r).ListUserRepos(page)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, repos)
+	writeJSON(w, http.StatusOK, paginatedResponse{
+		Data:    repos,
+		Page:    page,
+		HasNext: hasNext,
+		HasPrev: hasPrev,
+	})
 }
 
 // GET /api/strategies
@@ -67,17 +87,23 @@ func (h *Handler) ListStrategies(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, out)
 }
 
-// GET /api/repos/{owner}/{repo}/pulls
+// GET /api/repos/{owner}/{repo}/pulls?page=1
 func (h *Handler) ListPRs(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := r.PathValue("repo")
+	page := pageParam(r)
 
-	prs, err := h.ghClient(r).ListPRs(owner, repo)
+	prs, hasNext, hasPrev, err := h.ghClient(r).ListPRs(owner, repo, page)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, prs)
+	writeJSON(w, http.StatusOK, paginatedResponse{
+		Data:    prs,
+		Page:    page,
+		HasNext: hasNext,
+		HasPrev: hasPrev,
+	})
 }
 
 // GET /api/repos/{owner}/{repo}/pulls/{number}/files?strategy=by-size
@@ -109,12 +135,12 @@ func (h *Handler) GetPRFiles(w http.ResponseWriter, r *http.Request) {
 	groups := s.Organize(files)
 
 	type response struct {
-		Owner    string      `json:"owner"`
-		Repo     string      `json:"repo"`
-		Number   int         `json:"number"`
-		Strategy string      `json:"strategy"`
-		Total    int         `json:"total_files"`
-		Groups   interface{} `json:"groups"`
+		Owner    string `json:"owner"`
+		Repo     string `json:"repo"`
+		Number   int    `json:"number"`
+		Strategy string `json:"strategy"`
+		Total    int    `json:"total_files"`
+		Groups   any    `json:"groups"`
 	}
 	writeJSON(w, http.StatusOK, response{
 		Owner:    owner,

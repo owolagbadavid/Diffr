@@ -10,7 +10,6 @@ import (
 	"deniro/internal/api"
 	ghclient "deniro/internal/github"
 	_ "deniro/internal/strategy"
-	"deniro/web"
 
 	github_ratelimit "github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 )
@@ -38,7 +37,7 @@ func main() {
 	baseGH := ghclient.NewClient(*token, rateLimitedHTTPClient)
 
 	handler := api.NewHandler(baseGH)
-	router := api.NewRouter(handler, oauth, *token, web.Assets)
+	router := api.NewRouter(handler, oauth, *token)
 
 	addr := fmt.Sprintf(":%d", *port)
 	log.Printf("deniro running at http://localhost%s", addr)
