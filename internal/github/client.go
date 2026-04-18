@@ -1,22 +1,40 @@
 package github
 
 import (
-	"deniro/internal/model"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
+	"deniro/internal/model"
+
+	gh "github.com/google/go-github/v84/github"
 )
 
-// Client talks to the GitHub REST API.
+// Client talks to the GitHub API.
+// Most methods use manual HTTP for now; FetchPRFiles uses go-github
+// with its iterator to paginate through all changed files.
 type Client struct {
 	Token      string
 	HTTPClient *http.Client
+	ghClient   *gh.Client
 }
 
-// NewClient creates a GitHub client. Token can be empty for public repos.
-func NewClient(token string) *Client {
-	return &Client{Token: token, HTTPClient: http.DefaultClient}
+// NewClient creates a GitHub client with rate-limited HTTP and go-github.
+func NewClient(token string, httpClient *http.Client) *Client {
+	ghc := gh.NewClient(httpClient)
+	if token != "" {
+		ghc = ghc.WithAuthToken(token)
+	}
+	return &Client{
+		Token:      token,
+		HTTPClient: httpClient,
+		ghClient:   ghc,
+	}
 }
 
 type ghPR struct {
@@ -33,16 +51,6 @@ type ghPR struct {
 	Head struct {
 		Ref string `json:"ref"`
 	} `json:"head"`
-}
-
-type ghFile struct {
-	Filename  string `json:"filename"`
-	Status    string `json:"status"`
-	Additions int    `json:"additions"`
-	Deletions int    `json:"deletions"`
-	Patch     string `json:"patch"`
-	BlobURL     string `json:"blob_url"`
-	ContentsURL string `json:"contents_url"`
 }
 
 // GetUser returns the authenticated user.
@@ -106,9 +114,9 @@ func (c *Client) ListUserRepos() ([]model.Repository, error) {
 
 // ListPRs returns open pull requests for a repo.
 func (c *Client) ListPRs(owner, repo string) ([]model.PullRequest, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=open&per_page=30", owner, repo)
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls?state=open&per_page=30", owner, repo)
 
-	body, err := c.get(url)
+	body, err := c.get(apiURL)
 	if err != nil {
 		return nil, err
 	}
@@ -135,37 +143,71 @@ func (c *Client) ListPRs(owner, repo string) ([]model.PullRequest, error) {
 	return prs, nil
 }
 
-// FetchPRFiles returns the changed files for a pull request.
-func (c *Client) FetchPRFiles(owner, repo string, number int) ([]model.FileDiff, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls/%d/files?per_page=100", owner, repo, number)
+// FetchPRFiles returns all changed files for a pull request.
+// Uses go-github's iterator to paginate through every page automatically.
+func (c *Client) FetchPRFiles(ctx context.Context, owner, repo string, number int) ([]model.FileDiff, error) {
+	ctx = context.WithValue(ctx, gh.BypassRateLimitCheck, true)
 
-	body, err := c.get(url)
-	if err != nil {
-		return nil, err
-	}
-
-	var raw []ghFile
-	if err := json.Unmarshal(body, &raw); err != nil {
-		return nil, fmt.Errorf("decoding response: %w", err)
-	}
-
-	files := make([]model.FileDiff, len(raw))
-	for i, f := range raw {
-		files[i] = model.FileDiff{
-			Filename:  f.Filename,
-			Status:    f.Status,
-			Additions: f.Additions,
-			Deletions: f.Deletions,
-			Patch:     f.Patch,
-			BlobURL:     f.BlobURL,
-			ContentsURL: f.ContentsURL,
+	var files []model.FileDiff
+	for f, err := range c.ghClient.PullRequests.ListFilesIter(ctx, owner, repo, number, &gh.ListOptions{PerPage: 100}) {
+		if err != nil {
+			return nil, fmt.Errorf("listing PR files: %w", err)
 		}
+		files = append(files, model.FileDiff{
+			Filename:    f.GetFilename(),
+			Status:      f.GetStatus(),
+			Additions:   f.GetAdditions(),
+			Deletions:   f.GetDeletions(),
+			Patch:       f.GetPatch(),
+			BlobURL:     f.GetBlobURL(),
+			ContentsURL: f.GetContentsURL(),
+		})
 	}
 	return files, nil
 }
 
-func (c *Client) get(url string) ([]byte, error) {
-	req, err := http.NewRequest("GET", url, nil)
+// FetchFileContent fetches file content via the GitHub Contents API.
+// Accepts a contents_url like https://api.github.com/repos/{owner}/{repo}/contents/{path}?ref={sha}
+func (c *Client) FetchFileContent(ctx context.Context, contentsURL string) (string, error) {
+	owner, repo, path, ref, err := parseContentsURL(contentsURL)
+	if err != nil {
+		return "", err
+	}
+
+	ctx = context.WithValue(ctx, gh.BypassRateLimitCheck, true)
+	fileContent, _, _, err := c.ghClient.Repositories.GetContents(ctx, owner, repo, path, &gh.RepositoryContentGetOptions{Ref: ref})
+	if err != nil {
+		return "", fmt.Errorf("fetching file: %w", err)
+	}
+	if fileContent == nil {
+		return "", fmt.Errorf("path is a directory, not a file")
+	}
+	return fileContent.GetContent()
+}
+
+func fmtTime(t gh.Timestamp) string {
+	if t.IsZero() {
+		return ""
+	}
+	return t.Format(time.RFC3339)
+}
+
+func parseContentsURL(contentsURL string) (owner, repo, path, ref string, err error) {
+	u, err := url.Parse(contentsURL)
+	if err != nil {
+		return "", "", "", "", err
+	}
+	// Path: /repos/{owner}/{repo}/contents/{path}
+	trimmed := strings.TrimPrefix(u.Path, "/repos/")
+	parts := strings.SplitN(trimmed, "/", 4)
+	if len(parts) < 4 || parts[2] != "contents" {
+		return "", "", "", "", fmt.Errorf("invalid contents URL: %s", contentsURL)
+	}
+	return parts[0], parts[1], parts[3], u.Query().Get("ref"), nil
+}
+
+func (c *Client) get(apiURL string) ([]byte, error) {
+	req, err := http.NewRequest("GET", apiURL, nil)
 	if err != nil {
 		return nil, err
 	}

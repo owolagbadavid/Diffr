@@ -1,36 +1,36 @@
 package api
 
 import (
-	"encoding/base64"
 	"encoding/json"
-	"io"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"deniro/internal/github"
 	"deniro/internal/strategy"
 )
 
-type Handler struct{}
-
-func NewHandler() *Handler {
-	return &Handler{}
+type Handler struct {
+	baseGH *github.Client
 }
 
-// ghClient creates a GitHub client from the request's auth context.
-func ghClient(r *http.Request) *github.Client {
-	return github.NewClient(TokenFromContext(r.Context()))
+func NewHandler(baseGH *github.Client) *Handler {
+	return &Handler{baseGH: baseGH}
 }
 
-// GET /api/user — returns the logged-in user, or 401.
+// ghClient creates a per-request GitHub client with the user's token.
+func (h *Handler) ghClient(r *http.Request) *github.Client {
+	token := TokenFromContext(r.Context())
+	return github.NewClient(token, h.baseGH.HTTPClient)
+}
+
+// GET /api/user
 func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 	token := TokenFromContext(r.Context())
 	if token == "" {
 		writeJSON(w, http.StatusOK, map[string]any{"logged_in": false})
 		return
 	}
-	user, err := ghClient(r).GetUser()
+	user, err := h.ghClient(r).GetUser()
 	if err != nil {
 		writeJSON(w, http.StatusOK, map[string]any{"logged_in": false})
 		return
@@ -45,7 +45,7 @@ func (h *Handler) GetUser(w http.ResponseWriter, r *http.Request) {
 
 // GET /api/user/repos
 func (h *Handler) ListUserRepos(w http.ResponseWriter, r *http.Request) {
-	repos, err := ghClient(r).ListUserRepos()
+	repos, err := h.ghClient(r).ListUserRepos()
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		return
@@ -72,7 +72,7 @@ func (h *Handler) ListPRs(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := r.PathValue("repo")
 
-	prs, err := ghClient(r).ListPRs(owner, repo)
+	prs, err := h.ghClient(r).ListPRs(owner, repo)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		return
@@ -100,7 +100,7 @@ func (h *Handler) GetPRFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	files, err := ghClient(r).FetchPRFiles(owner, repo, number)
+	files, err := h.ghClient(r).FetchPRFiles(r.Context(), owner, repo, number)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		return
@@ -127,62 +127,21 @@ func (h *Handler) GetPRFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 // GET /api/raw?url=<contents_url>
-// Fetches file content via the GitHub Contents API, decodes the base64
-// response, and returns plain text.
 func (h *Handler) GetRawFile(w http.ResponseWriter, r *http.Request) {
 	contentsURL := r.URL.Query().Get("url")
-	if contentsURL == "" || !strings.HasPrefix(contentsURL, "https://api.github.com/") {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing or invalid url"})
+	if contentsURL == "" {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing url parameter"})
 		return
 	}
 
-	token := TokenFromContext(r.Context())
-
-	req, err := http.NewRequest("GET", contentsURL, nil)
-	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return
-	}
-	req.Header.Set("Accept", "application/vnd.github.v3+json")
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
+	content, err := h.ghClient(r).FetchFileContent(r.Context(), contentsURL)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
-		return
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "github returned " + resp.Status})
-		return
-	}
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
-		return
-	}
-
-	var result struct {
-		Content  string `json:"content"`
-		Encoding string `json:"encoding"`
-	}
-	if err := json.Unmarshal(body, &result); err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "failed to parse response"})
-		return
-	}
-
-	decoded, err := base64.StdEncoding.DecodeString(strings.ReplaceAll(result.Content, "\n", ""))
-	if err != nil {
-		writeJSON(w, http.StatusBadGateway, map[string]string{"error": "failed to decode content"})
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	w.Write(decoded)
+	w.Write([]byte(content))
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

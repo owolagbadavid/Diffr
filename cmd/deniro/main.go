@@ -8,8 +8,11 @@ import (
 	"os"
 
 	"deniro/internal/api"
+	ghclient "deniro/internal/github"
 	_ "deniro/internal/strategy"
 	"deniro/web"
+
+	github_ratelimit "github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 )
 
 func main() {
@@ -30,7 +33,11 @@ func main() {
 		BaseURL:      *baseURL,
 	}
 
-	handler := api.NewHandler()
+	// Rate-limited HTTP client shared across all requests
+	rateLimitedHTTPClient := github_ratelimit.NewClient(nil)
+	baseGH := ghclient.NewClient(*token, rateLimitedHTTPClient)
+
+	handler := api.NewHandler(baseGH)
 	router := api.NewRouter(handler, oauth, *token, web.Assets)
 
 	addr := fmt.Sprintf(":%d", *port)
