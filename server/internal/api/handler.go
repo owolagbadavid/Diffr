@@ -106,7 +106,7 @@ func (h *Handler) ListPRs(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// GET /api/repos/{owner}/{repo}/pulls/{number}/files?strategy=by-size
+// GET /api/repos/{owner}/{repo}/pulls/{number}/files?strategy=default
 func (h *Handler) GetPRFiles(w http.ResponseWriter, r *http.Request) {
 	owner := r.PathValue("owner")
 	repo := r.PathValue("repo")
@@ -118,7 +118,7 @@ func (h *Handler) GetPRFiles(w http.ResponseWriter, r *http.Request) {
 
 	stratName := r.URL.Query().Get("strategy")
 	if stratName == "" {
-		stratName = "by-size"
+		stratName = "default"
 	}
 	s, err := strategy.Get(stratName)
 	if err != nil {

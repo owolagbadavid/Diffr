@@ -18,7 +18,7 @@ export default function PRDetail() {
 
   const [data, setData] = useState<PRFilesResponse | null>(null);
   const [strategies, setStrategies] = useState<Strategy[]>([]);
-  const [strategy, setStrategy] = useState("by-size");
+  const [strategy, setStrategy] = useState("default");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notFound, setNotFound] = useState(false);
@@ -180,7 +180,7 @@ export default function PRDetail() {
               </option>
             ))
           ) : (
-            <option value="by-size">by-size</option>
+            <option value="default">default</option>
           )}
         </select>
       </div>

@@ -57,7 +57,7 @@ export async function fetchPRFiles(
   owner: string,
   repo: string,
   number: number,
-  strategy = "by-size"
+  strategy = "default"
 ): Promise<PRFilesResponse> {
   return request<PRFilesResponse>(
     `/api/repos/${owner}/${repo}/pulls/${number}/files?strategy=${strategy}`
