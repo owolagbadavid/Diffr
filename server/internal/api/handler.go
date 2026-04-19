@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"sync"
 
 	"diffr/internal/github"
 	"diffr/internal/strategy"
@@ -126,10 +127,30 @@ func (h *Handler) GetPRFiles(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	files, err := h.ghClient(r).FetchPRFiles(r.Context(), owner, repo, number)
+	ghClient := h.ghClient(r)
+	files, err := ghClient.FetchPRFiles(r.Context(), owner, repo, number)
 	if err != nil {
 		writeJSON(w, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		return
+	}
+
+	// Pre-fetch full file contents for tree-sitter analysis.
+	if stratName == "topological" {
+		var wg sync.WaitGroup
+		for i := range files {
+			if files[i].ContentsURL == "" || files[i].Status == "removed" {
+				continue
+			}
+			wg.Add(1)
+			go func(idx int) {
+				defer wg.Done()
+				content, err := ghClient.FetchFileContent(r.Context(), files[idx].ContentsURL)
+				if err == nil {
+					files[idx].Content = content
+				}
+			}(i)
+		}
+		wg.Wait()
 	}
 
 	groups := s.Organize(files)
