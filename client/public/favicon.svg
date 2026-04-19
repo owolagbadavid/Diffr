@@ -1,13 +1,16 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
-  <rect width="32" height="32" rx="7" fill="#161b22"/>
-  <rect width="32" height="32" rx="7" fill="none" stroke="#30363d" stroke-width="1"/>
+<svg width="160" height="160" viewBox="0 0 160 160" xmlns="http://www.w3.org/2000/svg">
+  <!-- background -->
+  <rect x="10" y="10" width="140" height="140" rx="28" fill="#161b22"></rect>
 
-  <!-- minus line (red) -->
-  <rect x="6" y="11" width="20" height="3" rx="1.5" fill="#f85149" opacity="0.9"/>
+  <!-- main vertical -->
+  <path d="M70 50 V110" stroke="#8b949e" stroke-width="7" stroke-linecap="round" fill="none"></path>
 
-  <!-- plus lines (green) -->
-  <rect x="6" y="18" width="20" height="3" rx="1.5" fill="#3fb950" opacity="0.9"/>
+  <!-- merging branch -->
+  <path d="M110 80 
+           C90 80, 75 95, 70 110" stroke="#8b949e" stroke-width="7" stroke-linecap="round" fill="none"></path>
 
-  <!-- vertical bar of plus -->
-  <rect x="14.5" y="15.5" width="3" height="8" rx="1.5" fill="#3fb950" opacity="0.9"/>
+  <!-- nodes -->
+  <circle cx="70" cy="45" r="10" fill="#161b22" stroke="#8b949e" stroke-width="6"></circle>
+  <circle cx="70" cy="115" r="10" fill="#161b22" stroke="#8b949e" stroke-width="6"></circle>
+  <circle cx="115" cy="80" r="10" fill="#161b22" stroke="#8b949e" stroke-width="6"></circle>
 </svg>
