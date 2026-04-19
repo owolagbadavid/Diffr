@@ -1,11 +1,11 @@
-import { Link, useLocation } from "react-router-dom"
-import { useAuth } from "../context/AuthContext"
+import { Link, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export default function Header() {
-  const { user } = useAuth()
-  const location = useLocation()
+  const { user } = useAuth();
+  const location = useLocation();
 
-  const crumbs = buildCrumbs(location.pathname)
+  const crumbs = buildCrumbs(location.pathname);
 
   return (
     <header className="flex items-center justify-between px-6 py-3 border-b border-[var(--border)] bg-[var(--surface)] sticky top-0 z-50">
@@ -44,11 +44,7 @@ export default function Header() {
             <Link to="/repos" className="text-[var(--muted)] hover:text-[var(--text)] px-2">
               My Repos
             </Link>
-            <img
-              className="w-6 h-6 rounded-full"
-              src={user.avatar_url}
-              alt=""
-            />
+            <img className="w-6 h-6 rounded-full" src={user.avatar_url} alt="" />
             <span className="font-medium">{user.login}</span>
             <a href="/auth/logout" className="text-[var(--accent)] hover:underline">
               Logout
@@ -64,32 +60,32 @@ export default function Header() {
         )}
       </div>
     </header>
-  )
+  );
 }
 
 interface Crumb {
-  label: string
-  to?: string
+  label: string;
+  to?: string;
 }
 
 function buildCrumbs(pathname: string): Crumb[] {
-  const parts = pathname.split("/").filter(Boolean)
+  const parts = pathname.split("/").filter(Boolean);
 
-  if (parts[0] === "repos") return [{ label: "Repos" }]
-  if (parts[0] === "explore") return [{ label: "Explore" }]
+  if (parts[0] === "repos") return [{ label: "Repos" }];
+  if (parts[0] === "explore") return [{ label: "Explore" }];
 
   if (parts.length >= 2) {
-    const owner = parts[0]
-    const repo = parts[1]
-    const crumbs: Crumb[] = [{ label: `${owner}/${repo}`, to: `/${owner}/${repo}` }]
+    const owner = parts[0];
+    const repo = parts[1];
+    const crumbs: Crumb[] = [{ label: `${owner}/${repo}`, to: `/${owner}/${repo}` }];
     if (parts.length === 3) {
-      crumbs[0].to = `/${owner}/${repo}`
-      crumbs.push({ label: `#${parts[2]}` })
+      crumbs[0].to = `/${owner}/${repo}`;
+      crumbs.push({ label: `#${parts[2]}` });
     } else {
-      delete crumbs[0].to
+      delete crumbs[0].to;
     }
-    return crumbs
+    return crumbs;
   }
 
-  return []
+  return [];
 }
