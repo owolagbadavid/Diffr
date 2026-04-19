@@ -52,7 +52,7 @@ export default function Header() {
           </>
         ) : (
           <a
-            href="/auth/login"
+            href={`${import.meta.env.VITE_API_URL}/auth/login`}
             className="px-3 py-1.5 bg-[var(--accent)] text-white rounded-lg text-[13px] font-medium hover:opacity-85"
           >
             Sign in
