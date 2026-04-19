@@ -1,12 +1,12 @@
-# deniro
+# diffr
 
 Customizable PR review tool. Browse your GitHub repos and review pull requests with different file organization strategies.
 
 ## Quick start
 
 ```bash
-go build ./cmd/deniro/
-./deniro
+go build ./cmd/diffr/
+./diffr
 # open http://localhost:3000
 ```
 
@@ -17,25 +17,25 @@ Create a [GitHub OAuth App](https://github.com/settings/developers) with callbac
 ```bash
 export GITHUB_CLIENT_ID=...
 export GITHUB_CLIENT_SECRET=...
-./deniro
+./diffr
 ```
 
 Without OAuth, you can still browse public repos via the manual input, or set `GITHUB_TOKEN` for private repo access.
 
 ## Review strategies
 
-| Strategy | Description |
-|---|---|
-| `by-size` | Groups files into small, medium, and large buckets |
-| `largest-first` | Sorts files by total changes, largest first |
-| `by-directory` | Groups files by parent directory |
+| Strategy        | Description                                        |
+| --------------- | -------------------------------------------------- |
+| `by-size`       | Groups files into small, medium, and large buckets |
+| `largest-first` | Sorts files by total changes, largest first        |
+| `by-directory`  | Groups files by parent directory                   |
 
 Adding a new strategy is one file in `internal/strategy/` with an `init()` that calls `Register()`.
 
 ## Project structure
 
 ```
-cmd/deniro/          CLI entrypoint (HTTP server)
+cmd/diffr/          CLI entrypoint (HTTP server)
 internal/
   api/               Handlers, router, GitHub OAuth
   github/            GitHub REST API client

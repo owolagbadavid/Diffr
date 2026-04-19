@@ -1,4 +1,4 @@
-module deniro
+module diffr
 
 go 1.26.2
 

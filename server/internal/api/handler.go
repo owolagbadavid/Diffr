@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"deniro/internal/github"
-	"deniro/internal/strategy"
+	"diffr/internal/github"
+	"diffr/internal/strategy"
 )
 
 type Handler struct {

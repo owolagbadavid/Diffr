@@ -1,33 +1,29 @@
-import { useState } from "react"
-import { useNavigate } from "react-router-dom"
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 export default function Explore() {
-  const navigate = useNavigate()
-  const [input, setInput] = useState("")
-  const [error, setError] = useState("")
+  const navigate = useNavigate();
+  const [input, setInput] = useState("");
+  const [error, setError] = useState("");
 
-  const recent: string[] = JSON.parse(
-    localStorage.getItem("deniro_recent") || "[]"
-  )
+  const recent: string[] = JSON.parse(localStorage.getItem("diffr_recent") || "[]");
 
   function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    const val = input.trim()
-    const parts = val.split("/")
+    e.preventDefault();
+    const val = input.trim();
+    const parts = val.split("/");
     if (parts.length !== 2 || !parts[0] || !parts[1]) {
-      setError("Enter a valid owner/repo (e.g. facebook/react)")
-      return
+      setError("Enter a valid owner/repo (e.g. facebook/react)");
+      return;
     }
-    saveRecent(val)
-    navigate(`/${parts[0]}/${parts[1]}`)
+    saveRecent(val);
+    navigate(`/${parts[0]}/${parts[1]}`);
   }
 
   function saveRecent(repo: string) {
-    const list: string[] = JSON.parse(
-      localStorage.getItem("deniro_recent") || "[]"
-    )
-    const updated = [repo, ...list.filter((r) => r !== repo)].slice(0, 10)
-    localStorage.setItem("deniro_recent", JSON.stringify(updated))
+    const list: string[] = JSON.parse(localStorage.getItem("diffr_recent") || "[]");
+    const updated = [repo, ...list.filter((r) => r !== repo)].slice(0, 10);
+    localStorage.setItem("diffr_recent", JSON.stringify(updated));
   }
 
   return (
@@ -41,8 +37,8 @@ export default function Explore() {
           type="text"
           value={input}
           onChange={(e) => {
-            setInput(e.target.value)
-            setError("")
+            setInput(e.target.value);
+            setError("");
           }}
           placeholder="owner/repo"
           autoComplete="off"
@@ -66,8 +62,8 @@ export default function Explore() {
               <button
                 key={r}
                 onClick={() => {
-                  const [o, n] = r.split("/")
-                  navigate(`/${o}/${n}`)
+                  const [o, n] = r.split("/");
+                  navigate(`/${o}/${n}`);
                 }}
                 className="text-left px-3 py-2 bg-[var(--surface)] border border-[var(--border)] rounded-lg text-[var(--accent)] text-sm font-mono hover:border-[var(--accent)] transition-colors"
               >
@@ -78,5 +74,5 @@ export default function Explore() {
         </div>
       )}
     </div>
-  )
+  );
 }

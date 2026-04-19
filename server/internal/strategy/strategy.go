@@ -1,7 +1,7 @@
 package strategy
 
 import (
-	"deniro/internal/model"
+	"diffr/internal/model"
 	"fmt"
 )
 

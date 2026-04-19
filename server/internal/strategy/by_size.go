@@ -1,6 +1,6 @@
 package strategy
 
-import "deniro/internal/model"
+import "diffr/internal/model"
 
 func init() { Register(bySize{}) }
 

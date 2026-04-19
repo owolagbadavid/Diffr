@@ -7,9 +7,9 @@ import (
 	"net/http"
 	"os"
 
-	"deniro/internal/api"
-	ghclient "deniro/internal/github"
-	_ "deniro/internal/strategy"
+	"diffr/internal/api"
+	ghclient "diffr/internal/github"
+	_ "diffr/internal/strategy"
 
 	github_ratelimit "github.com/gofri/go-github-ratelimit/v2/github_ratelimit"
 )
@@ -42,7 +42,7 @@ func main() {
 	router := api.NewRouter(handler, oauth, *token)
 
 	addr := fmt.Sprintf(":%d", *port)
-	log.Printf("deniro running at http://localhost%s", addr)
+	log.Printf("diffr running at http://localhost%s", addr)
 	if *clientID != "" {
 		log.Printf("GitHub OAuth enabled (client_id=%s...)", (*clientID)[:min(8, len(*clientID))])
 	} else {

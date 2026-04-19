@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"deniro/internal/model"
+	"diffr/internal/model"
 
 	gh "github.com/google/go-github/v84/github"
 )
