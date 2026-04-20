@@ -24,7 +24,7 @@ export default function Landing() {
         Sign in with GitHub to browse your repos, or enter any public repo below.
       </p>
       <a
-        href={`${import.meta.env.VITE_API_URL}/auth/login`}
+        href="/auth/login"
         className="inline-block px-6 py-2.5 bg-[#238636] text-white rounded-lg font-medium hover:opacity-85 transition-opacity"
       >
         Sign in with GitHub
