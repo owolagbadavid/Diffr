@@ -87,7 +87,7 @@ export async function searchCode(
 }
 
 export async function exchangeCode(code: string): Promise<void> {
-  const res = await fetch(BASE_URL+`/auth/callback?code=${encodeURIComponent(code)}`, {
+  const res = await fetch(BASE_URL+`/auth/exchange?code=${encodeURIComponent(code)}`, {
     method: "POST",
     credentials: "include",
   })

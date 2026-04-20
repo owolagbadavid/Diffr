@@ -10,7 +10,7 @@ func NewRouter(h *Handler, oauth OAuthConfig, fallbackToken string) http.Handler
 
 	// Auth routes
 	mux.HandleFunc("GET /auth/login", oauth.HandleLogin)
-	mux.HandleFunc("POST /auth/callback", oauth.HandleCallback)
+	mux.HandleFunc("POST /auth/exchange", oauth.HandleCallback)
 	mux.HandleFunc("POST /auth/logout", oauth.HandleLogout)
 
 	// API routes

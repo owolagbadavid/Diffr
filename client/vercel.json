@@ -1,7 +1,9 @@
 {
   "rewrites": [
     { "source": "/api/:path*", "destination": "https://deniro.onrender.com/api/:path*" },
-    { "source": "/auth/:path*", "destination": "https://deniro.onrender.com/auth/:path*" },
+    { "source": "/auth/login", "destination": "https://deniro.onrender.com/auth/login" },
+    { "source": "/auth/exchange", "destination": "https://deniro.onrender.com/auth/exchange" },
+    { "source": "/auth/logout", "destination": "https://deniro.onrender.com/auth/logout" },
     { "source": "/(.*)", "destination": "/" }
   ]
 }
